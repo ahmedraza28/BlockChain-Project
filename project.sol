@@ -9,6 +9,7 @@ contract Auction {
     address public highestBidder;
     uint public highestBindingBid;
     mapping(address => uint) public bids;
+    bool public auctionEndedByOwner;
 
     event BidPlaced(address bidder, uint bid, uint highestBindingBid);
     event AuctionStarted(uint startBlock, uint endBlock);
@@ -40,6 +41,12 @@ contract Auction {
         startBlock = block.number;
         endBlock = startBlock + _biddingTime;
         emit AuctionStarted(startBlock, endBlock);
+        canceled = false;
+        auctionEndedByOwner = false;
+    }
+
+    function getCurrentBlockNumber() public view returns (uint) {
+        return block.number;
     }
 
     function placeBid() external payable onlyDuringAuction onlyNotCanceled {
@@ -63,6 +70,17 @@ contract Auction {
     function cancelAuction() external onlyOwner onlyDuringAuction {
         canceled = true;
         emit AuctionCanceled();
+    }
+
+    function endAuctionByOwner() external onlyOwner onlyDuringAuction onlyNotCanceled {
+        auctionEndedByOwner = true;
+        emit AuctionEnded(owner, highestBindingBid);
+    }
+
+    function autoEndAuction() external onlyOwner onlyNotCanceled {
+        require(block.number > endBlock, "Cannot auto-end before endBlock");
+        auctionEndedByOwner = true;
+        emit AuctionEnded(owner, highestBindingBid);
     }
 
     function finalizeAuction() external onlyOwner onlyAfterAuction {
