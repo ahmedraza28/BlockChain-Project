@@ -10,6 +10,7 @@ contract Auction {
     uint public highestBindingBid;
     mapping(address => uint) public bids;
     bool public auctionEndedByOwner;
+    address[] private bidders; // Array to track all bidders
 
     event BidPlaced(address bidder, uint bid, uint highestBindingBid);
     event AuctionStarted(uint startBlock, uint endBlock);
@@ -55,6 +56,9 @@ contract Auction {
         uint newBid = bids[msg.sender] + msg.value;
         require(newBid > highestBindingBid, "Total bid must be higher than current binding bid");
 
+        if (bids[msg.sender] == 0) {
+            bidders.push(msg.sender);
+        }
         bids[msg.sender] = newBid;
 
         if (newBid <= bids[highestBidder]) {
@@ -69,6 +73,21 @@ contract Auction {
 
     function cancelAuction() external onlyOwner onlyDuringAuction {
         canceled = true;
+
+        for (uint i = 0; i < bidders.length; i++) {
+            address bidder = bidders[i];
+            uint bidAmount = bids[bidder];
+
+            if (bidAmount > 0) {
+                bids[bidder] = 0; // Reset the bid to prevent re-entrancy attack
+                payable(bidder).transfer(bidAmount);
+            }
+        }
+
+        highestBidder = address(0);
+        highestBindingBid = 0;
+        bidders = new address[](0); // Reset the bidders array
+
         emit AuctionCanceled();
     }
 
